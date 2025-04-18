@@ -21,8 +21,11 @@ Node.js server implementing Model Context Protocol (MCP) for readonly filesystem
 
 - **read_file**
   - Read complete contents of a file
-  - Input: `path` (string)
-  - Reads complete file contents with UTF-8 encoding
+  - Inputs:
+    - `path` (string): File path to read
+    - `from` (number): Optional. Start byte offset for reading. Defaults to 0.
+    - `to` (number): Optional. End byte offset (exclusive). If not set, reads to end of file.
+  - Reads file contents (full or partial) with UTF-8 encoding
 
 - **read_multiple_files**
   - Read multiple files simultaneously

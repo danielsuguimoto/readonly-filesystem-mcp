@@ -12,8 +12,9 @@ import path from 'path';
 import os from 'os';
 import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
-import { diffLines, createTwoFilesPatch } from 'diff';
 import { minimatch } from 'minimatch';
+import readline from 'readline';
+import fsSync from 'fs';
 
 // Command line argument parsing
 const args = process.argv.slice(2);
@@ -115,6 +116,8 @@ async function validatePath(requestedPath: string): Promise<string> {
 // Schema definitions
 const ReadFileArgsSchema = z.object({
     path: z.string(),
+    from: z.number().optional().nullable(),
+    to: z.number().optional().nullable(),
 });
 
 const ReadMultipleFilesArgsSchema = z.object({
@@ -234,7 +237,9 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             {
                 name: 'read_file',
                 description:
-                    'Read the complete contents of a file from the file system. ' +
+                    'Read the contents of a file from the file system. ' +
+                    'You can specify optional from and to parameters to read a specific range of lines. ' +
+                    'If these are not provided, the complete file contents are returned. ' +
                     'Handles various text encodings and provides detailed error messages ' +
                     'if the file cannot be read. Use this tool when you need to examine ' +
                     'the contents of a single file. Only works within allowed directories.',
@@ -325,9 +330,34 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     );
                 }
                 const validPath = await validatePath(parsed.data.path);
-                const content = await fs.readFile(validPath, 'utf-8');
+
+                if (parsed.data.from === null && parsed.data.to === null) {
+                    return {
+                        content: [
+                            {
+                                type: 'text',
+                                text: await fs.readFile(validPath, 'utf-8'),
+                            },
+                        ],
+                    };
+                }
+
+                const from = parsed.data.from ?? 0;
+                const to = parsed.data.to;
+                const rl = readline.createInterface({
+                    input: fsSync.createReadStream(validPath),
+                    crlfDelay: Infinity,
+                });
+                let lineNum = 0;
+                const lines = [];
+                for await (const line of rl) {
+                    if (lineNum >= from && (to == null || lineNum <= to)) lines.push(line);
+                    if (to != null && lineNum > to) break;
+                    lineNum++;
+                }
+
                 return {
-                    content: [{ type: 'text', text: content }],
+                    content: [{ type: 'text', text: lines.join('\n') }],
                 };
             }
 
