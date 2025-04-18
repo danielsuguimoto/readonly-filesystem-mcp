@@ -76,7 +76,7 @@ Note: you can provide sandboxed directories to the server by mounting them to `/
       "command": "npx",
       "args": [
         "-y",
-        "@modelcontextprotocol/server-filesystem",
+        "@danielsuguimoto/readonly-server-filesystem",
         "/Users/username/Desktop",
         "/path/to/other/allowed/dir"
       ]
