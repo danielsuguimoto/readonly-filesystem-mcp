@@ -13,6 +13,7 @@
     ],
     "scripts": {
         "build": "tsc && shx chmod +x dist/*.js",
+        "test": "node --test test/*.test.ts",
         "prepare": "npm run build",
         "watch": "tsc --watch",
         "inspect": "npx @modelcontextprotocol/inspector node dist/index.js ."
