@@ -19,7 +19,7 @@ export function isPathWithinAllowedDirectories(
 ): boolean {
     return allowedDirectories.some((dir) => {
         if (dir === path.parse(dir).root) {
-            return true;
+            return path.parse(resolvedPath).root === dir;
         }
         return (
             resolvedPath === dir || resolvedPath.startsWith(dir + path.sep)

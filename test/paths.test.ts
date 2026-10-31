@@ -128,12 +128,26 @@ test('denies a nonexistent file with a nonexistent parent outside the allowed di
     );
 });
 
-test('isPathWithinAllowedDirectories: filesystem root as allowed dir permits everything', () => {
+test('isPathWithinAllowedDirectories: filesystem root as allowed dir permits everything under that root', () => {
     const root = path.parse(process.cwd()).root;
     assert.equal(isPathWithinAllowedDirectories('/etc/hostname', [root]), true);
     assert.equal(
         isPathWithinAllowedDirectories('/anywhere/at/all', [root]),
         true,
+    );
+});
+
+test('isPathWithinAllowedDirectories: root allowance is restricted to the same root', () => {
+    const root = path.parse(process.cwd()).root;
+    // A resolved path under a different root (e.g. D:\ or a UNC share when
+    // C:\ is allowed on Windows) must not match.
+    assert.equal(
+        isPathWithinAllowedDirectories('relative/evil', [root]),
+        false,
+    );
+    assert.equal(
+        isPathWithinAllowedDirectories(path.join('..', 'evil'), [root]),
+        false,
     );
 });
 
