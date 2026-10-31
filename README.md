@@ -65,8 +65,6 @@ Node.js server implementing Model Context Protocol (MCP) for readonly filesystem
 ## Usage with Claude Desktop
 Add this to your `claude_desktop_config.json`:
 
-Note: you can provide sandboxed directories to the server by mounting them to `/projects`. Adding the `ro` flag will make the directory readonly by the server.
-
 ### NPX
 
 ```json
