@@ -9,12 +9,16 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import fs from 'fs/promises';
 import path from 'path';
-import os from 'os';
 import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { minimatch } from 'minimatch';
 import readline from 'readline';
 import fsSync from 'fs';
+import {
+    expandHome,
+    normalizePath,
+    validatePath,
+} from './paths.js';
 
 // Command line argument parsing
 const args = process.argv.slice(2);
@@ -23,18 +27,6 @@ if (args.length === 0) {
         'Usage: mcp-server-filesystem <allowed-directory> [additional-directories...]',
     );
     process.exit(1);
-}
-
-// Normalize all paths consistently
-function normalizePath(p: string): string {
-    return path.normalize(p);
-}
-
-function expandHome(filepath: string): string {
-    if (filepath.startsWith('~/') || filepath === '~') {
-        return path.join(os.homedir(), filepath.slice(1));
-    }
-    return filepath;
 }
 
 // Store allowed directories in normalized form
@@ -58,59 +50,8 @@ await Promise.all(
     }),
 );
 
-// Security utilities
-async function validatePath(requestedPath: string): Promise<string> {
-    const expandedPath = expandHome(requestedPath);
-    const absolute = path.isAbsolute(expandedPath)
-        ? path.resolve(expandedPath)
-        : path.resolve(process.cwd(), expandedPath);
-
-    const normalizedRequested = normalizePath(absolute);
-
-    // Check if path is within allowed directories
-    const isAllowed = allowedDirectories.some((dir) =>
-        normalizedRequested.startsWith(dir),
-    );
-    if (!isAllowed) {
-        throw new Error(
-            `Access denied - path outside allowed directories: ${absolute} not in ${allowedDirectories.join(
-                ', ',
-            )}`,
-        );
-    }
-
-    // Handle symlinks by checking their real path
-    try {
-        const realPath = await fs.realpath(absolute);
-        const normalizedReal = normalizePath(realPath);
-        const isRealPathAllowed = allowedDirectories.some((dir) =>
-            normalizedReal.startsWith(dir),
-        );
-        if (!isRealPathAllowed) {
-            throw new Error(
-                'Access denied - symlink target outside allowed directories',
-            );
-        }
-        return realPath;
-    } catch (error) {
-        // For new files that don't exist yet, verify parent directory
-        const parentDir = path.dirname(absolute);
-        try {
-            const realParentPath = await fs.realpath(parentDir);
-            const normalizedParent = normalizePath(realParentPath);
-            const isParentAllowed = allowedDirectories.some((dir) =>
-                normalizedParent.startsWith(dir),
-            );
-            if (!isParentAllowed) {
-                throw new Error(
-                    'Access denied - parent directory outside allowed directories',
-                );
-            }
-            return absolute;
-        } catch {
-            throw new Error(`Parent directory does not exist: ${parentDir}`);
-        }
-    }
+async function validate(requestedPath: string): Promise<string> {
+    return validatePath(requestedPath, allowedDirectories);
 }
 
 // Schema definitions
@@ -197,7 +138,7 @@ async function searchFiles(
 
             try {
                 // Validate each path before processing
-                await validatePath(fullPath);
+                await validate(fullPath);
 
                 // Check if path matches any exclude pattern
                 const relativePath = path.relative(rootPath, fullPath);
@@ -329,7 +270,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                         `Invalid arguments for read_file: ${parsed.error}`,
                     );
                 }
-                const validPath = await validatePath(parsed.data.path);
+                const validPath = await validate(parsed.data.path);
 
                 if (parsed.data.from === null && parsed.data.to === null) {
                     return {
@@ -371,7 +312,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 const results = await Promise.all(
                     parsed.data.paths.map(async (filePath: string) => {
                         try {
-                            const validPath = await validatePath(filePath);
+                            const validPath = await validate(filePath);
                             const content = await fs.readFile(
                                 validPath,
                                 'utf-8',
@@ -398,7 +339,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                         `Invalid arguments for list_directory: ${parsed.error}`,
                     );
                 }
-                const validPath = await validatePath(parsed.data.path);
+                const validPath = await validate(parsed.data.path);
                 const entries = await fs.readdir(validPath, {
                     withFileTypes: true,
                 });
@@ -432,7 +373,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 async function buildTree(
                     currentPath: string,
                 ): Promise<TreeEntry[]> {
-                    const validPath = await validatePath(currentPath);
+                    const validPath = await validate(currentPath);
                     const entries = await fs.readdir(validPath, {
                         withFileTypes: true,
                     });
@@ -473,7 +414,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                         `Invalid arguments for search_files: ${parsed.error}`,
                     );
                 }
-                const validPath = await validatePath(parsed.data.path);
+                const validPath = await validate(parsed.data.path);
                 const results = await searchFiles(
                     validPath,
                     parsed.data.pattern,
@@ -499,7 +440,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                         `Invalid arguments for get_file_info: ${parsed.error}`,
                     );
                 }
-                const validPath = await validatePath(parsed.data.path);
+                const validPath = await validate(parsed.data.path);
                 const info = await getFileStats(validPath);
                 return {
                     content: [

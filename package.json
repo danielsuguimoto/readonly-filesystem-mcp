@@ -5,6 +5,9 @@
     "license": "MIT",
     "author": "Daniel Jun Suguimoto",
     "type": "module",
+    "engines": {
+        "node": ">=22.18.0"
+    },
     "bin": {
         "mcp-server-readonly-filesystem": "dist/index.js"
     },
@@ -13,6 +16,7 @@
     ],
     "scripts": {
         "build": "tsc && shx chmod +x dist/*.js",
+        "test": "node --test test/*.test.ts",
         "prepare": "npm run build",
         "watch": "tsc --watch",
         "inspect": "npx @modelcontextprotocol/inspector node dist/index.js ."
